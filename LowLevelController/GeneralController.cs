@@ -134,58 +134,72 @@ public class GeneralController
         {
             if (targetProc != null)
             {
-                if ((heldKeys[vkCode] == 0 && wParam == WM_KEYDOWN) || (heldKeys[vkCode] == 1 && wParam == WM_KEYUP))
+                /*
+                uint scanCode = MapVirtualKey((uint)vkCode, 0);
+                int newParams = (int)(1 & 0xFFFF
+                                 | (scanCode << 16) & 0xFF
+                                 | (0)
+                                 | (0)
+                                 | (uint)(wParam == WM_KEYUP ? 1 << 30 : 0)
+                                 | (uint)(wParam == WM_KEYUP ? 1 << 31: 0));
+                
+                uint curThread = GetCurrentThreadId();
+                uint targetThread = GetWindowThreadProcessId(targetProc.MainWindowHandle, out uint processId);
+                
+                AttachThreadInput(curThread, targetThread, true);
+                SetForegroundWindow(targetProc.MainWindowHandle);
+                AttachThreadInput(curThread, targetThread, false);
+                PostMessage(targetProc.MainWindowHandle, (uint)wParam, vkCode, newParams);*/
+                
+                uint dwDevice;
+                switch(inputDevice)
                 {
-                    uint dwDevice;
-                    switch(inputDevice)
-                    {
-                        case DeviceType.Mouse:
-                            dwDevice = 0;
-                            break;
-                        case DeviceType.Keyboard:
-                            dwDevice = 1;
-                            break;
-                        default:
-                            dwDevice = 2;
-                            break;
-                    }
-
-                    uint dwAct;
-                    switch (wParam)
-                    {
-                        case WM_KEYDOWN:
-                            dwAct = 0;
-                            break;
-                        case WM_KEYUP:
-                            dwAct = 2;
-                            break;
-                        default:
-                            dwAct = 0;
-                            break;
-                    }
-
-                    Input inp = new Input
-                    {
-                        type = dwDevice,
-                        union = new InputUnion
-                        {
-                            ki = new KeyboardInput
-                            {
-                                wVk = (ushort)vkCode,
-                                wScan = 0,
-                                dwFlags = dwAct,
-                                time = 0,
-                                dwExtraInfo = 0
-                            }
-                        }
-                    };
-                    
-                    SetForegroundWindow(targetProc.MainWindowHandle);
-                    
-                    IntPtr inpLoc = Marshal.AllocHGlobal(Marshal.SizeOf<Input>());
-                    Marshal.StructureToPtr(inp, inpLoc, false);
-                    SendInput(1, inpLoc, Input.Size);
+                    case DeviceType.Mouse:
+                        dwDevice = 0;
+                        break;
+                    case DeviceType.Keyboard:
+                        dwDevice = 1;
+                        break;
+                    default:
+                        dwDevice = 2;
+                        break;
                 }
+
+                uint dwAct;
+                switch (wParam)
+                {
+                    case WM_KEYDOWN:
+                        dwAct = 0;
+                        break;
+                    case WM_KEYUP:
+                        dwAct = 2;
+                        break;
+                    default:
+                        dwAct = 0;
+                        break;
+                }
+
+                Input inp = new Input
+                {
+                    type = dwDevice,
+                    union = new InputUnion
+                    {
+                        ki = new KeyboardInput
+                        {
+                            wVk = (ushort)vkCode,
+                            wScan = 0,
+                            dwFlags = dwAct,
+                            time = 0,
+                            dwExtraInfo = 0
+                        }
+                    }
+                };
+                
+                SetForegroundWindow(targetProc.MainWindowHandle);
+                
+                IntPtr inpLoc = Marshal.AllocHGlobal(Marshal.SizeOf<Input>());
+                Marshal.StructureToPtr(inp, inpLoc, false);
+                SendInput(1, inpLoc, Input.Size);
                 
                 if(vkCode > 255 || vkCode < 0){ return 1; }
                 else if (wParam == WM_KEYDOWN)
