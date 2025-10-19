@@ -7,6 +7,25 @@
         mc:Ignorable="d"
         Title="MainWindow" Height="450" Width="800">
     <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="200"/>
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="20"/>
+            <RowDefinition Height="50"/>
+        </Grid.RowDefinitions>
+        <StackPanel Grid.Row="0">
+            <StackPanel.Resources>
+            </StackPanel.Resources>
+            <ComboBox Name="ProcessChoice"
+                      Text="Process to point input to"
+                      IsEditable="true"
+                      IsReadOnly="true"/>
 
+            <TextBlock Text="{Binding ElementName=comboBox1, Path=SelectedItem}"/>
+        </StackPanel>
+        <Button Grid.Row="1" Name="BtnAddHook" Background="Pink" Click="AddHook">
+            Add hook to selected process
+        </Button>
     </Grid>
 </Window>
