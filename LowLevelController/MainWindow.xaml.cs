@@ -19,5 +19,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+
+        GeneralController keyboardController = new GeneralController();
     }
 }
