@@ -83,17 +83,14 @@ public class GeneralController
     [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
     private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
 
-    [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    private static extern IntPtr SendInput(uint numInputs, IntPtr buf, int bufSize);
-    
-    [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    private static extern IntPtr PostMessage(IntPtr windowHandle, uint msg, IntPtr wParam, IntPtr lParam);
-    
-    [DllImport("user32.dll")]
-    public static extern uint MapVirtualKey(uint uCode, uint uMapType);
-    
     [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
     private static extern IntPtr GetModuleHandle(string lpModuleName);
+    
+    [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+    private static extern IntPtr SendInput(uint numInputs, IntPtr buf, int bufSize);
+
+    [DllImport("user32.dll")]
+    static extern bool SetForegroundWindow(IntPtr hWnd);
     
     // the current device being monitored
     private static DeviceType inputDevice = DeviceType.Unset;
@@ -137,31 +134,7 @@ public class GeneralController
         {
             if (targetProc != null)
             {
-                /*
-                uint scanCode = MapVirtualKey((uint)vkCode, 0);
-                uint newParams = 1
-                                 | (scanCode << 16)
-                                 | (0)
-                                 | (0)
-                                 | (uint)(wParam == WM_KEYUP ? 1 << 30 : 0)
-                                 | (uint)(wParam == WM_KEYUP ? 1 << 31: 0);
-                PostMessage(targetProc.Handle, (uint)wParam, (IntPtr)vkCode, (IntPtr)newParams);
                 if ((heldKeys[vkCode] == 0 && wParam == WM_KEYDOWN) || (heldKeys[vkCode] == 1 && wParam == WM_KEYUP))
-                {
-                    
-                }
-                
-                if(vkCode > 255 || vkCode < 0){ return 1; }
-                else if (wParam == WM_KEYDOWN)
-                {
-                    heldKeys[vkCode] = 1;
-                }
-                else if (wParam == WM_KEYUP)
-                {
-                    heldKeys[vkCode] = 0;
-                }*/
-                
-                /*if ((heldKeys[vkCode] == 0 && wParam == WM_KEYDOWN) || (heldKeys[vkCode] == 1 && wParam == WM_KEYUP))
                 {
                     uint dwDevice;
                     switch(inputDevice)
@@ -206,11 +179,23 @@ public class GeneralController
                             }
                         }
                     };
-                
+                    
+                    SetForegroundWindow(targetProc.MainWindowHandle);
+                    
                     IntPtr inpLoc = Marshal.AllocHGlobal(Marshal.SizeOf<Input>());
                     Marshal.StructureToPtr(inp, inpLoc, false);
                     SendInput(1, inpLoc, Input.Size);
-                }*/
+                }
+                
+                if(vkCode > 255 || vkCode < 0){ return 1; }
+                else if (wParam == WM_KEYDOWN)
+                {
+                    heldKeys[vkCode] = 1;
+                }
+                else if (wParam == WM_KEYUP)
+                {
+                    heldKeys[vkCode] = 0;
+                }
             }
         }
         Console.WriteLine($"hook was called");
