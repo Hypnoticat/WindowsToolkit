@@ -88,7 +88,7 @@ public class GeneralController
     
     [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
     private static extern IntPtr SendInput(uint numInputs, IntPtr buf, int bufSize);
-
+    
     [DllImport("user32.dll")]
     static extern bool SetForegroundWindow(IntPtr hWnd);
     

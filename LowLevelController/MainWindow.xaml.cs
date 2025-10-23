@@ -10,14 +10,22 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 using System.Management;
+using System.Runtime.InteropServices;
 
 namespace LowLevelController;
 
 /// <summary>
 /// Interaction logic for MainWindow.xaml
-/// </summary>
+/// </summary
 public partial class MainWindow : Window
 {
+    [DllImport("user32.dll", SetLastError = true)]
+    static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
+    
+    [DllImport("user32.dll", SetLastError = true)]
+    static extern bool EnumChildWindows(IntPtr parentHandle, EnumCallback proc, IntPtr lParam);
+    delegate void EnumCallback(IntPtr parentHandle, IntPtr lParam);
+    
     List<Process> runningProcs = new List<Process>();
     private GeneralController keyboardController;
     
@@ -62,9 +70,24 @@ public partial class MainWindow : Window
         procTerm.Start();
     }
 
+    public void EnumWindow(IntPtr hWnd, IntPtr lParam)
+    {
+        var className = new StringBuilder(256);
+        GetClassName(hWnd, className, className.Capacity);
+        ProcessChild.Items.Add(className.ToString());
+    }
+
     public void AddHook(object sender, RoutedEventArgs e)
     {
-        keyboardController.SetProcess(Process.GetProcessesByName((string)ProcessChoice.SelectedValue)[0]);
+        keyboardController.SetProcess(Process.GetProcessesByName((string)ProcessChild.SelectedValue)[0]);
         keyboardController.AddHook();
+    }
+
+    private void FindChildren(object sender, SelectionChangedEventArgs e)
+    {
+        ProcessChild.Items.Clear();
+        
+        Process parent = Process.GetProcessesByName((string)ProcessChoice.SelectedValue)[0];
+        EnumChildWindows(parent.Handle, EnumWindow, IntPtr.Zero);
     }
 }
