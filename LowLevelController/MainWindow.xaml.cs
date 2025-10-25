@@ -12,6 +12,7 @@ using System.Windows.Navigation;
 using System.Windows.Shapes;
 using System.Management;
 using System.Runtime.InteropServices;
+using System.Windows.Automation;
 
 namespace LowLevelController;
 
@@ -20,13 +21,6 @@ namespace LowLevelController;
 /// </summary
 public partial class MainWindow : Window
 {
-    [DllImport("user32.dll", SetLastError = true)]
-    static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
-    
-    [DllImport("user32.dll", SetLastError = true)]
-    static extern bool EnumChildWindows(IntPtr parentHandle, EnumCallback proc, IntPtr lParam);
-    delegate void EnumCallback(IntPtr parentHandle, IntPtr lParam);
-    
     private ManagementEventWatcher procRun;
     private ManagementEventWatcher procTerm;
     
@@ -98,25 +92,25 @@ public partial class MainWindow : Window
     
     public void AddHook(object sender, RoutedEventArgs e)
     {
-        keyboardController.SetProcess(Process.GetProcessesByName((string)ProcessChild.SelectedValue)[0]);
+        keyboardController.SetProcess(Process.GetProcessesByName((string)ProcessChild.SelectedValue).FirstOrDefault());
         keyboardController.AddHook();
     }
 
-    private void FindChildren(object sender, SelectionChangedEventArgs e)
+    private void FindControl(object sender, SelectionChangedEventArgs e)
     {
         ChildProcs.Clear();
         
-        Process parent = Process.GetProcessesByName((string)ProcessChoice.SelectedValue)[0];
-        EnumChildWindows(parent.MainWindowHandle, EnumWindow, IntPtr.Zero);
-    }
-    
-    public void EnumWindow(IntPtr hWnd, IntPtr lParam)
-    {
-        var className = new StringBuilder(256);
-        GetClassName(hWnd, className, className.Capacity);
-        Application.Current.Dispatcher.Invoke(() =>
+        Process? parent = Process.GetProcessesByName((string)ProcessChoice.SelectedValue).FirstOrDefault();
+        AutomationElement element = AutomationElement.FromHandle(parent.MainWindowHandle);
+        AutomationElement control = element.FindFirst(TreeScope.Descendants,
+            new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Document));
+
+        if (control != null)
         {
-            ChildProcs.Add(className.ToString());
-        });
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                ChildProcs.Add(control.Current.Name);
+            });
+        }
     }
 }

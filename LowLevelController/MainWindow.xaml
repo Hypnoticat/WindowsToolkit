@@ -23,7 +23,7 @@
                       Text="Process to point input to"
                       IsEditable="true"
                       IsReadOnly="true"
-                      SelectionChanged="FindChildren"/>
+                      SelectionChanged="FindControl"/>
 
             <TextBlock Text="{Binding ElementName=comboBox1, Path=SelectedItem}"/>
         </StackPanel>
@@ -34,8 +34,7 @@
                       ItemsSource="{Binding ChildProcs}"
                       Text="Control to point input to"
                       IsEditable="true"
-                      IsReadOnly="true"
-                      SelectionChanged="FindChildren"/>
+                      IsReadOnly="true"/>
 
             <TextBlock Text="{Binding ElementName=comboBox1, Path=SelectedItem}"/>
         </StackPanel>
