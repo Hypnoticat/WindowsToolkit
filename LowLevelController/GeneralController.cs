@@ -92,6 +92,22 @@ public class GeneralController
     [DllImport("user32.dll")]
     static extern bool SetForegroundWindow(IntPtr hWnd);
     
+    [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+    private static extern IntPtr PostMessage(IntPtr windowHandle, uint msg, IntPtr wParam, IntPtr lParam);
+    
+    [DllImport("user32.dll")]
+    public static extern uint MapVirtualKey(uint uCode, uint uMapType);
+    
+    [DllImport("kernel32.dll")]
+    public static extern uint GetCurrentThreadId();
+    
+    [DllImport("user32.dll")]
+    public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+    
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+    
     // the current device being monitored
     private static DeviceType inputDevice = DeviceType.Unset;
     
@@ -134,7 +150,7 @@ public class GeneralController
         {
             if (targetProc != null)
             {
-                /*
+                
                 uint scanCode = MapVirtualKey((uint)vkCode, 0);
                 int newParams = (int)(1 & 0xFFFF
                                  | (scanCode << 16) & 0xFF
@@ -149,9 +165,9 @@ public class GeneralController
                 AttachThreadInput(curThread, targetThread, true);
                 SetForegroundWindow(targetProc.MainWindowHandle);
                 AttachThreadInput(curThread, targetThread, false);
-                PostMessage(targetProc.MainWindowHandle, (uint)wParam, vkCode, newParams);*/
+                PostMessage(targetProc.MainWindowHandle, (uint)wParam, vkCode, newParams);
                 
-                uint dwDevice;
+                /*uint dwDevice;
                 switch(inputDevice)
                 {
                     case DeviceType.Mouse:
@@ -200,16 +216,7 @@ public class GeneralController
                 IntPtr inpLoc = Marshal.AllocHGlobal(Marshal.SizeOf<Input>());
                 Marshal.StructureToPtr(inp, inpLoc, false);
                 SendInput(1, inpLoc, Input.Size);
-                
-                if(vkCode > 255 || vkCode < 0){ return 1; }
-                else if (wParam == WM_KEYDOWN)
-                {
-                    heldKeys[vkCode] = 1;
-                }
-                else if (wParam == WM_KEYUP)
-                {
-                    heldKeys[vkCode] = 0;
-                }
+                */
             }
         }
         Console.WriteLine($"hook was called");

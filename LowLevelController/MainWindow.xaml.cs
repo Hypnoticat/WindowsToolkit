@@ -28,6 +28,8 @@ public partial class MainWindow : Window
     public ObservableCollection<String> ChildProcs { get; set; }
     private GeneralController keyboardController;
     
+    private Dictionary<string, int> nameToId = new Dictionary<string, int>();
+    
     public MainWindow()
     {
         InitializeComponent();
@@ -92,7 +94,7 @@ public partial class MainWindow : Window
     
     public void AddHook(object sender, RoutedEventArgs e)
     {
-        keyboardController.SetProcess(Process.GetProcessesByName((string)ProcessChild.SelectedValue).FirstOrDefault());
+        keyboardController.SetProcess(Process.GetProcessById(nameToId[(string)ProcessChild.SelectedValue]));
         keyboardController.AddHook();
     }
 
@@ -102,14 +104,18 @@ public partial class MainWindow : Window
         
         Process? parent = Process.GetProcessesByName((string)ProcessChoice.SelectedValue).FirstOrDefault();
         AutomationElement element = AutomationElement.FromHandle(parent.MainWindowHandle);
-        AutomationElement control = element.FindFirst(TreeScope.Descendants,
+
+        var controlCond = new OrCondition(
+            new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Edit),
             new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Document));
+        AutomationElement control = element.FindFirst(TreeScope.Descendants, controlCond);
 
         if (control != null)
         {
             Application.Current.Dispatcher.Invoke(() =>
             {
                 ChildProcs.Add(control.Current.Name);
+                nameToId.Add((string)control.Current.Name, control.Current.ProcessId);
             });
         }
     }
