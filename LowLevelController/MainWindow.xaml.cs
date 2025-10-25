@@ -95,17 +95,7 @@ public partial class MainWindow : Window
         procRun.Start();
         procTerm.Start();
     }
-
-    public void EnumWindow(IntPtr hWnd, IntPtr lParam)
-    {
-        var className = new StringBuilder(256);
-        GetClassName(hWnd, className, className.Capacity);
-        Application.Current.Dispatcher.Invoke(() =>
-        {
-            ChildProcs.Add(className.ToString());
-        });
-    }
-
+    
     public void AddHook(object sender, RoutedEventArgs e)
     {
         keyboardController.SetProcess(Process.GetProcessesByName((string)ProcessChild.SelectedValue)[0]);
@@ -117,6 +107,16 @@ public partial class MainWindow : Window
         ChildProcs.Clear();
         
         Process parent = Process.GetProcessesByName((string)ProcessChoice.SelectedValue)[0];
-        EnumChildWindows(parent.Handle, EnumWindow, IntPtr.Zero);
+        EnumChildWindows(parent.MainWindowHandle, EnumWindow, IntPtr.Zero);
+    }
+    
+    public void EnumWindow(IntPtr hWnd, IntPtr lParam)
+    {
+        var className = new StringBuilder(256);
+        GetClassName(hWnd, className, className.Capacity);
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            ChildProcs.Add(className.ToString());
+        });
     }
 }
