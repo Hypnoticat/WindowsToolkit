@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
@@ -26,12 +27,19 @@ public partial class MainWindow : Window
     static extern bool EnumChildWindows(IntPtr parentHandle, EnumCallback proc, IntPtr lParam);
     delegate void EnumCallback(IntPtr parentHandle, IntPtr lParam);
     
-    List<Process> runningProcs = new List<Process>();
+    private ManagementEventWatcher procRun;
+    private ManagementEventWatcher procTerm;
+    
+    public ObservableCollection<String> MainProcs { get; set; }
+    public ObservableCollection<String> ChildProcs { get; set; }
     private GeneralController keyboardController;
     
     public MainWindow()
     {
         InitializeComponent();
+        this.DataContext = this;
+        MainProcs = new ObservableCollection<String>();
+        ChildProcs = new ObservableCollection<String>();
         
         keyboardController = new GeneralController();
         keyboardController.SetDevice(GeneralController.DeviceType.Keyboard);
@@ -42,28 +50,46 @@ public partial class MainWindow : Window
     {
         foreach (Process proc in Process.GetProcesses().Where(proc => proc.MainWindowHandle != 0))
         {
-            ProcessChoice.Items.Add(proc.ProcessName);
+            MainProcs.Add(proc.ProcessName);
         }
-        ManagementEventWatcher procRun = new ManagementEventWatcher("SELECT * FROM Win32_ProcessStartTrace");
-        ManagementEventWatcher procTerm = new ManagementEventWatcher("SELECT * FROM Win32_ProcessStopTrace");
+        procRun = new ManagementEventWatcher("SELECT * FROM Win32_ProcessStartTrace");
+        procTerm = new ManagementEventWatcher("SELECT * FROM Win32_ProcessStopTrace");
 
-
-        procRun.EventArrived += (s, e) =>
+        procRun.EventArrived += async (s, e) =>
         {
-            Process proc = (Process) e.NewEvent.Properties["Process"].Value;
-            if (proc != null && proc.MainWindowHandle != 0)
+            await Task.Delay(1000);
+            int procId = Convert.ToInt32(e.NewEvent.Properties["ProcessID"].Value);
+
+            try
             {
-                ProcessChoice.Items.Add(proc.ProcessName);
+                string procName = Process.GetProcessById(procId).ProcessName;
+                if (Process.GetProcessById(procId).MainWindowHandle != 0)
+                {
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        MainProcs.Add(procName);
+                    });
+                }
             }
+            catch{}
         };
 
         procTerm.EventArrived += (s, e) =>
         {
-            Process proc = (Process) e.NewEvent.Properties["Process"].Value;
-            if (proc != null && runningProcs.Contains(proc) && proc.MainWindowHandle != 0)
+            int procId = Convert.ToInt32(e.NewEvent.Properties["ProcessID"].Value);
+            try
             {
-                ProcessChoice.Items.Remove(proc.ProcessName);
+                string procName = Process.GetProcessById(procId).ProcessName;
+                if (MainProcs.Contains(procName))
+                {
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        MainProcs.Remove(procName);
+                    });
+                }
             }
+            catch{}
+            
         };
 
         procRun.Start();
@@ -74,7 +100,10 @@ public partial class MainWindow : Window
     {
         var className = new StringBuilder(256);
         GetClassName(hWnd, className, className.Capacity);
-        ProcessChild.Items.Add(className.ToString());
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            ChildProcs.Add(className.ToString());
+        });
     }
 
     public void AddHook(object sender, RoutedEventArgs e)
@@ -85,7 +114,7 @@ public partial class MainWindow : Window
 
     private void FindChildren(object sender, SelectionChangedEventArgs e)
     {
-        ProcessChild.Items.Clear();
+        ChildProcs.Clear();
         
         Process parent = Process.GetProcessesByName((string)ProcessChoice.SelectedValue)[0];
         EnumChildWindows(parent.Handle, EnumWindow, IntPtr.Zero);

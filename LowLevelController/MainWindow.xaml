@@ -18,7 +18,8 @@
         <StackPanel Grid.Row="0">
             <StackPanel.Resources>
             </StackPanel.Resources>
-            <ComboBox Name="ProcessChoice"
+            <ComboBox x:Name="ProcessChoice"
+                      ItemsSource="{Binding MainProcs}"
                       Text="Process to point input to"
                       IsEditable="true"
                       IsReadOnly="true"
@@ -30,6 +31,7 @@
             <StackPanel.Resources>
             </StackPanel.Resources>
             <ComboBox Name="ProcessChild"
+                      ItemsSource="{Binding ChildProcs}"
                       Text="Control to point input to"
                       IsEditable="true"
                       IsReadOnly="true"
