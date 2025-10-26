@@ -18,6 +18,7 @@
             <StackPanel.Resources>
             </StackPanel.Resources>
             <ComboBox Name="ProcessChoice"
+                      ItemsSource="{Binding runningProcs}"
                       Text="Process to point input to"
                       IsEditable="true"
                       IsReadOnly="true"/>

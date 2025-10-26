@@ -1,14 +1,6 @@
-﻿using System.Diagnostics;
-using System.Text;
+﻿using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 using System.Management;
 
 namespace LowLevelController;
@@ -18,12 +10,18 @@ namespace LowLevelController;
 /// </summary>
 public partial class MainWindow : Window
 {
-    List<Process> runningProcs = new List<Process>();
+    public ObservableCollection<string> runningProcs { get; set; }
+    private Dictionary<int, string> idToName = new Dictionary<int, string>();
     private GeneralController keyboardController;
+    
+    private ManagementEventWatcher procRun;
+    private ManagementEventWatcher procTerm;
     
     public MainWindow()
     {
         InitializeComponent();
+        runningProcs = new ObservableCollection<string>();
+        this.DataContext = this;
         
         keyboardController = new GeneralController();
         keyboardController.SetDevice(GeneralController.DeviceType.Keyboard);
@@ -34,28 +32,48 @@ public partial class MainWindow : Window
     {
         foreach (Process proc in Process.GetProcesses().Where(proc => proc.MainWindowHandle != 0))
         {
-            ProcessChoice.Items.Add(proc.ProcessName);
+            runningProcs.Add(proc.ProcessName);
+            idToName.Add(proc.Id, proc.ProcessName);
         }
-        ManagementEventWatcher procRun = new ManagementEventWatcher("SELECT * FROM Win32_ProcessStartTrace");
-        ManagementEventWatcher procTerm = new ManagementEventWatcher("SELECT * FROM Win32_ProcessStopTrace");
+        procRun = new ManagementEventWatcher("SELECT * FROM Win32_ProcessStartTrace");
+        procTerm = new ManagementEventWatcher("SELECT * FROM Win32_ProcessStopTrace");
 
 
-        procRun.EventArrived += (s, e) =>
+        procRun.EventArrived += async (s, e) =>
         {
-            Process proc = (Process) e.NewEvent.Properties["Process"].Value;
-            if (proc != null && proc.MainWindowHandle != 0)
+            await Task.Delay(1000);
+            int procId = Convert.ToInt32(e.NewEvent.Properties["ProcessID"].Value);
+
+            try
             {
-                ProcessChoice.Items.Add(proc.ProcessName);
+                string procName = Process.GetProcessById(procId).ProcessName;
+                idToName.Add(procId, procName);
+                if (Process.GetProcessById(procId).MainWindowHandle != 0)
+                {
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        runningProcs.Add(procName);
+                    });
+                }
             }
+            catch{}
         };
 
         procTerm.EventArrived += (s, e) =>
         {
-            Process proc = (Process) e.NewEvent.Properties["Process"].Value;
-            if (proc != null && runningProcs.Contains(proc) && proc.MainWindowHandle != 0)
+            int procId = Convert.ToInt32(e.NewEvent.Properties["ProcessID"].Value);
+            try
             {
-                ProcessChoice.Items.Remove(proc.ProcessName);
+                string procName = idToName[procId];
+                if (runningProcs.Contains(procName))
+                {
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        runningProcs.Remove(procName);
+                    });
+                }
             }
+            catch{}
         };
 
         procRun.Start();

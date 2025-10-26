@@ -101,7 +101,6 @@ public class GeneralController
     /// Inserts the given hook process into the hook chain for the given process
     /// </summary>
     /// <param name="hkProc">The hook code</param>
-    /// <param name="targetProc">The process to insert the hook into</param>
     /// <returns>0 for success, 1 for process non-existent</returns>
     private static IntPtr SetHook(InputProc hkProc)
     {
