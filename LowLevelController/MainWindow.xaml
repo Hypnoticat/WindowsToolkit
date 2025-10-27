@@ -3,9 +3,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:LowLevelController"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
+        Title="MainWindow" Height="450" Width="800" d:DataContext="{d:DesignInstance }">
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="200"/>
@@ -18,7 +17,7 @@
             <StackPanel.Resources>
             </StackPanel.Resources>
             <ComboBox Name="ProcessChoice"
-                      ItemsSource="{Binding runningProcs}"
+                      ItemsSource="{Binding RunningProcs}"
                       Text="Process to point input to"
                       IsEditable="true"
                       IsReadOnly="true"/>

@@ -5,7 +5,7 @@ namespace LowLevelController;
 
 // struct definitions for sendInput
 [StructLayout(LayoutKind.Sequential)]
-struct Input
+internal struct Input
 {
     public uint type;
     public InputUnion union;
@@ -13,7 +13,7 @@ struct Input
 }
 
 [StructLayout(LayoutKind.Explicit)]
-struct InputUnion
+internal struct InputUnion
 {
     [FieldOffset(0)] public MouseInput mi;
     [FieldOffset(0)] public KeyboardInput ki;
@@ -21,7 +21,7 @@ struct InputUnion
 }
 
 [StructLayout(LayoutKind.Sequential)]
-struct MouseInput
+internal struct MouseInput
 {
     public int dx;
     public int dy;
@@ -32,7 +32,7 @@ struct MouseInput
 }
 
 [StructLayout(LayoutKind.Sequential)]
-struct KeyboardInput
+internal struct KeyboardInput
 {
     public ushort wVk;
     public ushort wScan;
@@ -42,14 +42,14 @@ struct KeyboardInput
 }
 
 [StructLayout(LayoutKind.Sequential)]
-struct HardwareInput
+internal struct HardwareInput
 {
     public uint uMsg;
     public ushort wParamL;
     public ushort wParamH;
 }
 
-public class GeneralController
+public partial class GeneralController
 {
     /// <summary>
     /// The device the controller will manage
@@ -64,51 +64,48 @@ public class GeneralController
     private const int VK_ESCAPE = 0x1B;
     private const int WM_KEYDOWN = 0x100;
     private const int WM_KEYUP = 0x101;
-
-    private static int[] heldKeys = new int[255];
     
     private static IntPtr hookId = IntPtr.Zero;
-    private static InputProc hkProc = HookCallback;
+    private static readonly InputProc hkProc = HookCallback;
     
     // layout of a hook call
     private delegate IntPtr InputProc(int code, IntPtr wParam, IntPtr lParam);
     
     // relevant DLL imports
-    [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    private static extern IntPtr SetWindowsHookEx(int hookId, InputProc hookProc, IntPtr dllHandle, uint threadId);
+    [LibraryImport("user32.dll", SetLastError = true)]
+    private static partial IntPtr SetWindowsHookEx(int hookId, InputProc hookProc, IntPtr dllHandle, uint threadId);
 
-    [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    private static extern bool UnhookWindowsHookEx(IntPtr hookHandle);
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool UnhookWindowsHookEx(IntPtr hookHandle);
 
-    [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
-
-    [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    private static extern IntPtr GetModuleHandle(string lpModuleName);
+    [LibraryImport("kernel32.dll", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
+    private static partial IntPtr GetModuleHandle(string lpModuleName);
     
-    [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    private static extern IntPtr SendInput(uint numInputs, IntPtr buf, int bufSize);
+    [LibraryImport("user32.dll", SetLastError = true)]
+    private static partial void SendInput(uint numInputs, IntPtr buf, int bufSize);
 
-    [DllImport("user32.dll")]
-    static extern bool SetForegroundWindow(IntPtr hWnd);
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial void SetForegroundWindow(IntPtr hWnd);
     
     // the current device being monitored
     private static DeviceType inputDevice = DeviceType.Unset;
     
-    private static Process? targetProc = null;
+    private static Process? targetProc;
     
     /// <summary>
     /// Inserts the given hook process into the hook chain for the given process
     /// </summary>
-    /// <param name="hkProc">The hook code</param>
+    /// <param name="hook">The hook code</param>
     /// <returns>0 for success, 1 for process non-existent</returns>
-    private static IntPtr SetHook(InputProc hkProc)
+    private static IntPtr SetHook(InputProc hook)
     {
         // insert the hook into the chain
         Process curProc = Process.GetCurrentProcess();
         if (curProc.MainModule != null)
         {
-            return SetWindowsHookEx((int)inputDevice, hkProc, GetModuleHandle(curProc.MainModule.ModuleName), 0);
+            return SetWindowsHookEx((int)inputDevice, hook, GetModuleHandle(curProc.MainModule.ModuleName), 0);
         }
         return 1;
     }
@@ -149,34 +146,20 @@ public class GeneralController
                 SetForegroundWindow(targetProc.MainWindowHandle);
                 AttachThreadInput(curThread, targetThread, false);
                 PostMessage(targetProc.MainWindowHandle, (uint)wParam, vkCode, newParams);*/
-                
-                uint dwDevice;
-                switch(inputDevice)
-                {
-                    case DeviceType.Mouse:
-                        dwDevice = 0;
-                        break;
-                    case DeviceType.Keyboard:
-                        dwDevice = 1;
-                        break;
-                    default:
-                        dwDevice = 2;
-                        break;
-                }
 
-                uint dwAct;
-                switch (wParam)
+                uint dwDevice = inputDevice switch
                 {
-                    case WM_KEYDOWN:
-                        dwAct = 0;
-                        break;
-                    case WM_KEYUP:
-                        dwAct = 2;
-                        break;
-                    default:
-                        dwAct = 0;
-                        break;
-                }
+                    DeviceType.Mouse => 0,
+                    DeviceType.Keyboard => 1,
+                    _ => 2
+                };
+
+                uint dwAct = wParam switch
+                {
+                    WM_KEYDOWN => 0,
+                    WM_KEYUP => 2,
+                    _ => 0
+                };
 
                 Input inp = new Input
                 {
@@ -199,16 +182,6 @@ public class GeneralController
                 IntPtr inpLoc = Marshal.AllocHGlobal(Marshal.SizeOf<Input>());
                 Marshal.StructureToPtr(inp, inpLoc, false);
                 SendInput(1, inpLoc, Input.Size);
-                
-                if(vkCode > 255 || vkCode < 0){ return 1; }
-                else if (wParam == WM_KEYDOWN)
-                {
-                    heldKeys[vkCode] = 1;
-                }
-                else if (wParam == WM_KEYUP)
-                {
-                    heldKeys[vkCode] = 0;
-                }
             }
         }
         Console.WriteLine($"hook was called");
@@ -222,7 +195,7 @@ public class GeneralController
     /// Removes this hook from its current process
     /// </summary>
     /// <returns></returns>
-    public static IntPtr RemoveHook()
+    private static IntPtr RemoveHook()
     {
         return UnhookWindowsHookEx(hookId) ? IntPtr.Zero : 1;
     }
@@ -231,7 +204,7 @@ public class GeneralController
     /// Sets the process to attach the hook to
     /// </summary>
     /// <param name="process">The process to attach to(has type Process, DO NOT PASS THE NAME)</param>
-    public void SetProcess(Process? process)
+    public static void SetProcess(Process? process)
     {
         if(hookId != 0){ RemoveHook(); }
         targetProc = process;
@@ -241,13 +214,13 @@ public class GeneralController
     /// Sets the input device to interrupt
     /// </summary>
     /// <param name="device">The type of device</param>
-    public void SetDevice(DeviceType device)
+    public static void SetDevice(DeviceType device)
     {
         if(hookId != 0){ RemoveHook(); }
         inputDevice = device;
     }
 
-    public void AddHook()
+    public static void AddHook()
     {
         if (inputDevice != DeviceType.Unset && targetProc != null)
         {
