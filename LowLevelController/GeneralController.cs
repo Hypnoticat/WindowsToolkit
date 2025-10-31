@@ -65,41 +65,52 @@ public partial class GeneralController
     private const int WM_KEYDOWN = 0x100;
     private const int WM_KEYUP = 0x101;
     
-    private static IntPtr hookId = IntPtr.Zero;
-    private static readonly InputProc hkProc = HookCallback;
+    private IntPtr hookId = IntPtr.Zero;
+    private readonly InputProc hkProc;
     
     // layout of a hook call
     private delegate IntPtr InputProc(int code, IntPtr wParam, IntPtr lParam);
     
     // relevant DLL imports
-    [LibraryImport("user32.dll", SetLastError = true)]
-    private static partial IntPtr SetWindowsHookEx(int hookId, InputProc hookProc, IntPtr dllHandle, uint threadId);
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr SetWindowsHookEx(int hookId, InputProc hookProc, IntPtr dllHandle, uint threadId);
 
-    [LibraryImport("user32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool UnhookWindowsHookEx(IntPtr hookHandle);
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool UnhookWindowsHookEx(IntPtr hookHandle);
 
-    [LibraryImport("kernel32.dll", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
-    private static partial IntPtr GetModuleHandle(string lpModuleName);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr GetModuleHandle(string lpModuleName);
     
-    [LibraryImport("user32.dll", SetLastError = true)]
-    private static partial void SendInput(uint numInputs, IntPtr buf, int bufSize);
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern void SendInput(uint numInputs, IntPtr buf, int bufSize);
 
-    [LibraryImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial void SetForegroundWindow(IntPtr hWnd);
+    [DllImport("user32.dll")]
+    private static extern void SetForegroundWindow(IntPtr hWnd);
+    
+    [DllImport("user32.dll", CharSet=CharSet.Ansi, SetLastError = true)]
+    private static extern short VkKeyScanEx(char c, IntPtr layout);
+    
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetKeyboardLayout(uint idThread);
     
     // the current device being monitored
-    private static DeviceType inputDevice = DeviceType.Unset;
+    private DeviceType inputDevice = DeviceType.Unset;
+    private Dictionary<Process, List<int>> procToCodes = new Dictionary<Process, List<int>>();
+    private GCHandle gcHandle;
     
-    private static Process? targetProc;
+    public GeneralController()
+    {
+        hkProc = HookCallback;
+        gcHandle = GCHandle.Alloc(this);
+    }
+    
     
     /// <summary>
     /// Inserts the given hook process into the hook chain for the given process
     /// </summary>
     /// <param name="hook">The hook code</param>
     /// <returns>0 for success, 1 for process non-existent</returns>
-    private static IntPtr SetHook(InputProc hook)
+    private IntPtr SetHook(InputProc hook)
     {
         // insert the hook into the chain
         Process curProc = Process.GetCurrentProcess();
@@ -117,18 +128,18 @@ public partial class GeneralController
     /// <param name="wParam">Defined differently for different input types</param>
     /// <param name="lParam">Defined differently for different input types</param>
     /// <returns>0 for success, 1 for hook non-existent</returns>
-    private static IntPtr HookCallback(int code, IntPtr wParam, IntPtr lParam)
+    private IntPtr HookCallback(int code, IntPtr wParam, IntPtr lParam)
     {
         // read input and decide what to do with it
         int vkCode = Marshal.ReadInt32(lParam);
         if (code >= 0 && inputDevice == DeviceType.Keyboard && wParam == WM_KEYDOWN && vkCode == VK_ESCAPE)
         {
             Console.WriteLine("escaped the hook");
-            if(hookId != 0){ return RemoveHook(); }
+            if(hookId != 0){ return RemoveHook(hookId); }
         }
         else
         {
-            if (targetProc != null)
+            if (procToCodes.Count != 0)
             {
                 /*
                 uint scanCode = MapVirtualKey((uint)vkCode, 0);
@@ -176,15 +187,20 @@ public partial class GeneralController
                         }
                     }
                 };
-                
-                SetForegroundWindow(targetProc.MainWindowHandle);
+
+                foreach (KeyValuePair<Process, List<int>> proc in procToCodes)
+                {
+                    if (proc.Value.Contains(vkCode))
+                    {
+                        SetForegroundWindow(proc.Key.MainWindowHandle);
+                    }
+                }
                 
                 IntPtr inpLoc = Marshal.AllocHGlobal(Marshal.SizeOf<Input>());
                 Marshal.StructureToPtr(inp, inpLoc, false);
                 SendInput(1, inpLoc, Input.Size);
             }
         }
-        Console.WriteLine($"hook was called");
         
         // continue the input hook chain
         //return CallNextHookEx(hookId, code, wParam, lParam);
@@ -195,7 +211,12 @@ public partial class GeneralController
     /// Removes this hook from its current process
     /// </summary>
     /// <returns></returns>
-    private static IntPtr RemoveHook()
+    private static IntPtr RemoveHook(IntPtr hookId)
+    {
+        return UnhookWindowsHookEx(hookId) ? IntPtr.Zero : 1;
+    }
+
+    private IntPtr RemoveHook()
     {
         return UnhookWindowsHookEx(hookId) ? IntPtr.Zero : 1;
     }
@@ -204,25 +225,33 @@ public partial class GeneralController
     /// Sets the process to attach the hook to
     /// </summary>
     /// <param name="process">The process to attach to(has type Process, DO NOT PASS THE NAME)</param>
-    public static void SetProcess(Process? process)
+    public void SetProcess(Process process)
     {
         if(hookId != 0){ RemoveHook(); }
-        targetProc = process;
+        
+        procToCodes.Add(process, new List<int>());
+    }
+
+    public void AddKey(Process p, char c)
+    {
+        short key = VkKeyScanEx(c, GetKeyboardLayout(0));
+        int keycode = key & 0xFF;
+        procToCodes[p].Add(keycode);
     }
 
     /// <summary>
     /// Sets the input device to interrupt
     /// </summary>
     /// <param name="device">The type of device</param>
-    public static void SetDevice(DeviceType device)
+    public void SetDevice(DeviceType device)
     {
         if(hookId != 0){ RemoveHook(); }
         inputDevice = device;
     }
 
-    public static void AddHook()
+    public void AddHook()
     {
-        if (inputDevice != DeviceType.Unset && targetProc != null)
+        if (inputDevice != DeviceType.Unset && procToCodes.Count != 0)
         {
             if(hookId != 0){ RemoveHook(); }
             hookId = SetHook(hkProc); 
