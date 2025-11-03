@@ -135,7 +135,7 @@ public partial class GeneralController
         if (code >= 0 && inputDevice == DeviceType.Keyboard && wParam == WM_KEYDOWN && vkCode == VK_ESCAPE)
         {
             Console.WriteLine("escaped the hook");
-            if(hookId != 0){ return RemoveHook(hookId); }
+            if(hookId != IntPtr.Zero){ return RemoveHook(); }
         }
         else
         {
@@ -193,12 +193,11 @@ public partial class GeneralController
                     if (proc.Value.Contains(vkCode))
                     {
                         SetForegroundWindow(proc.Key.MainWindowHandle);
+                        IntPtr inpLoc = Marshal.AllocHGlobal(Marshal.SizeOf<Input>());
+                        Marshal.StructureToPtr(inp, inpLoc, false);
+                        SendInput(1, inpLoc, Input.Size);
                     }
                 }
-                
-                IntPtr inpLoc = Marshal.AllocHGlobal(Marshal.SizeOf<Input>());
-                Marshal.StructureToPtr(inp, inpLoc, false);
-                SendInput(1, inpLoc, Input.Size);
             }
         }
         
@@ -211,14 +210,12 @@ public partial class GeneralController
     /// Removes this hook from its current process
     /// </summary>
     /// <returns></returns>
-    private static IntPtr RemoveHook(IntPtr hookId)
-    {
-        return UnhookWindowsHookEx(hookId) ? IntPtr.Zero : 1;
-    }
-
     private IntPtr RemoveHook()
     {
-        return UnhookWindowsHookEx(hookId) ? IntPtr.Zero : 1;
+        procToCodes.Clear();
+        IntPtr success = UnhookWindowsHookEx(hookId) ? IntPtr.Zero : 1;
+        hookId = IntPtr.Zero;
+        return success;
     }
 
     /// <summary>
@@ -227,7 +224,7 @@ public partial class GeneralController
     /// <param name="process">The process to attach to(has type Process, DO NOT PASS THE NAME)</param>
     public void SetProcess(Process process)
     {
-        if(hookId != 0){ RemoveHook(); }
+        if(hookId != IntPtr.Zero){ RemoveHook(); }
         
         procToCodes.Add(process, new List<int>());
     }
@@ -245,7 +242,7 @@ public partial class GeneralController
     /// <param name="device">The type of device</param>
     public void SetDevice(DeviceType device)
     {
-        if(hookId != 0){ RemoveHook(); }
+        if(hookId != IntPtr.Zero){ RemoveHook(); }
         inputDevice = device;
     }
 
@@ -253,7 +250,7 @@ public partial class GeneralController
     {
         if (inputDevice != DeviceType.Unset && procToCodes.Count != 0)
         {
-            if(hookId != 0){ RemoveHook(); }
+            if(hookId != IntPtr.Zero){ RemoveHook(); }
             hookId = SetHook(hkProc); 
         }
     }

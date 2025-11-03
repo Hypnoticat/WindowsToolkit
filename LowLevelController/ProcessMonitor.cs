@@ -50,6 +50,7 @@ public class ProcessMonitor(ObservableCollection<string> pCollection)
             try
             {
                 string procName = idToName[procId];
+                idToName.Remove(procId);
                 if (RunningProcs.Contains(procName))
                 {
                     Application.Current.Dispatcher.Invoke(() =>
